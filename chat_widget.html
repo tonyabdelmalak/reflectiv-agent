@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<!-- Simple chat widget for interacting with the Reflectiv AI agent.
+     This widget connects to the /chat endpoint of your server and displays
+     messages in a conversation view. Adjust the CSS to match your brand. -->
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Reflectiv Chat Widget</title>
+  <style>
+    #chat-container {
+      border: 1px solid #ccc;
+      border-radius: 5px;
+      width: 100%;
+      max-width: 350px;
+      height: 450px;
+      display: flex;
+      flex-direction: column;
+      font-family: Arial, sans-serif;
+    }
+    #conversation {
+      flex: 1;
+      overflow-y: auto;
+      padding: 10px;
+    }
+    #conversation p {
+      margin: 4px 0;
+      line-height: 1.4;
+    }
+    #user-input {
+      border: none;
+      border-top: 1px solid #ccc;
+      padding: 10px;
+      font-size: 14px;
+    }
+  </style>
+</head>
+<body>
+  <div id="chat-container">
+    <div id="conversation"></div>
+    <input id="user-input" type="text" placeholder="Type your question..." autocomplete="off" />
+  </div>
+<script>
+  (function() {
+    let sessionId = null;
+    const convo = document.getElementById('conversation');
+    const input = document.getElementById('user-input');
+    // Replace this with your deployment URL, e.g., 'https://yourdomain.com/chat'
+    const chatEndpoint = window.ChatEndpoint || 'http://localhost:5000/chat';
+
+    function appendMessage(sender, text) {
+      const p = document.createElement('p');
+      p.innerHTML = `<strong>${sender}:</strong> ${text}`;
+      convo.appendChild(p);
+      convo.scrollTop = convo.scrollHeight;
+    }
+
+    async function sendMessage(msg) {
+      try {
+        const response = await fetch(chatEndpoint, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ message: msg, session_id: sessionId })
+        });
+        const data = await response.json();
+        if (data.session_id) sessionId = data.session_id;
+        if (data.response) appendMessage('Agent', data.response);
+      } catch (err) {
+        appendMessage('Agent', 'Sorry, there was an error connecting to the server.');
+      }
+    }
+
+    input.addEventListener('keydown', function(event) {
+      if (event.key === 'Enter') {
+        const msg = input.value.trim();
+        if (msg) {
+          appendMessage('You', msg);
+          sendMessage(msg);
+          input.value = '';
+        }
+      }
+    });
+  })();
+</script>
+</body>
+</html>
