@@ -1,4 +1,9 @@
 flask
-openai
+# Pin openai to a version below 1.0.0 because openai>=1.0 introduces breaking API
+# changes (see https://github.com/openai/openai-python/discussions/742). The
+# ai_agent_server.py currently uses the legacy openai.ChatCompletion API,
+# which is removed in v1.0 and later. Pinning to <1.0.0 ensures the agent
+# continues to function until the code is updated to the new API.
+openai<1.0.0
 twilio
 flask-cors
