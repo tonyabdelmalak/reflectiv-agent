@@ -70,6 +70,21 @@ def ensure_openai_configured():
 
 app = Flask(__name__)
 
+# Enable Cross-Origin Resource Sharing (CORS) to allow the web chat widget on
+# external domains (e.g., GitHub Pages) to interact with this server. Without
+# CORS, browsers will block POST requests from different origins, leading to
+# connection errors in the chat widget. The flask-cors package adds the
+# appropriate Access-Control-Allow-Origin headers to all responses. If
+# flask-cors is not installed, CORS support will not be enabled and the
+# server will continue to function for same-origin requests.
+try:
+    from flask_cors import CORS  # type: ignore
+    CORS(app)
+except ImportError:
+    # If flask_cors isn't available, you can install it via requirements.txt
+    # or handle CORS manually by adding headers in individual responses.
+    pass
+
 # In-memory conversation store; in production, replace with a persistent store.
 conversations: Dict[str, List[Dict[str, Any]]] = {}
 
