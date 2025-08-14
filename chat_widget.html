@@ -61,6 +61,7 @@
       height: 64px;
       border-radius: 50%;
       overflow: hidden;
+      object-fit: cover; /* ensure the avatar maintains its aspect ratio and fills the circle */
       cursor: pointer;
       z-index: 10000;
       box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
@@ -115,11 +116,14 @@
           // utterance can be customised (e.g., pitch or rate) to sound more
           // human‑like.  Visitors can disable sound via their browser if
           // desired.
+          // Cancel any ongoing speech to avoid overlapping utterances
+          window.speechSynthesis.cancel();
           const utterance = new SpeechSynthesisUtterance(data.response);
+          // Use a friendly, warm tone with moderate pitch and rate for natural delivery
           utterance.pitch = 1.0;
           utterance.rate = 1.0;
           utterance.volume = 1.0;
-          speechSynthesis.speak(utterance);
+          window.speechSynthesis.speak(utterance);
         }
       } catch (err) {
         appendMessage('Agent', 'Sorry, there was an error connecting to the server.');
