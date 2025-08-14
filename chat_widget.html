@@ -46,24 +46,30 @@
       padding: 10px;
       font-size: 14px;
     }
+    /*
+     * The chat toggle uses Tony's portrait as an avatar.  It’s styled as a
+     * circular button positioned near the top‑right of the page.  Adjust the
+     * width/height or top/right offsets to reposition it.  A subtle box
+     * shadow helps the photo stand out against the page.  When clicked,
+     * it toggles the chat container.
+     */
     #chat-toggle {
       position: fixed;
       top: 80px;
       right: 20px;
-      background: #007bff;
-      color: #fff;
-      padding: 12px 16px;
-      border-radius: 20px;
+      width: 64px;
+      height: 64px;
+      border-radius: 50%;
+      overflow: hidden;
       cursor: pointer;
-      font-weight: bold;
       z-index: 10000;
       box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
     }
   </style>
 </head>
 <body>
-  <!-- Toggle button to open/close the chat. Placed near the nav bar. -->
-  <div id="chat-toggle">Chat with Tony</div>
+  <!-- Toggle button to open/close the chat.  Uses Tony's avatar image. -->
+  <img id="chat-toggle" src="tony_avatar.jpg" alt="Chat with Tony" />
   <div id="chat-container">
     <div id="conversation"></div>
     <input id="user-input" type="text" placeholder="Type your question..." autocomplete="off" />
@@ -85,7 +91,7 @@
       convo.scrollTop = convo.scrollHeight;
     }
 
-    // Toggle chat visibility when the button is clicked
+    // Toggle chat visibility when the avatar is clicked
     toggleBtn.addEventListener('click', function() {
       if (chatContainer.style.display === 'none' || !chatContainer.style.display) {
         chatContainer.style.display = 'flex';
@@ -103,7 +109,18 @@
         });
         const data = await response.json();
         if (data.session_id) sessionId = data.session_id;
-        if (data.response) appendMessage('Agent', data.response);
+        if (data.response) {
+          appendMessage('Agent', data.response);
+          // Speak the response using the browser's SpeechSynthesis API.  The
+          // utterance can be customised (e.g., pitch or rate) to sound more
+          // human‑like.  Visitors can disable sound via their browser if
+          // desired.
+          const utterance = new SpeechSynthesisUtterance(data.response);
+          utterance.pitch = 1.0;
+          utterance.rate = 1.0;
+          utterance.volume = 1.0;
+          speechSynthesis.speak(utterance);
+        }
       } catch (err) {
         appendMessage('Agent', 'Sorry, there was an error connecting to the server.');
       }
