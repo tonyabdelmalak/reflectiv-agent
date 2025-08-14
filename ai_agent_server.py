@@ -30,10 +30,15 @@ from typing import Dict, List, Any
 from flask import Flask, request, jsonify
 
 # Attempt to import external libraries. If missing, set them to None.
+# The newer OpenAI Python library (>=1.0) exposes an `OpenAI` client class rather
+# than static methods. We attempt to import it here. If the import fails, the
+# variable will remain `None` and a RuntimeError will be raised when the API
+# client is needed.
 try:
-    import openai
+    # In openai>=1.0 the primary entry point is the `OpenAI` class.
+    from openai import OpenAI  # type: ignore
 except ImportError:
-    openai = None  # type: ignore
+    OpenAI = None  # type: ignore
 
 try:
     from twilio.twiml.voice_response import VoiceResponse
@@ -56,16 +61,31 @@ def load_persona() -> str:
     )
 
 
-def ensure_openai_configured():
-    """Ensure the OpenAI API key and library are available."""
-    if openai is None:
+# Global OpenAI client instance. This will be initialized in `ensure_openai_configured`.
+openai_client = None
+
+
+def ensure_openai_configured() -> None:
+    """
+    Ensure that the OpenAI Python client is available and configured. This
+    function initializes a global `openai_client` instance using the
+    `OPENAI_API_KEY` environment variable. It should be called before any
+    requests to the OpenAI API.
+    """
+    global openai_client
+    if openai_client is not None:
+        return
+    if OpenAI is None:
         raise RuntimeError(
             "The openai package is not installed. Install it with 'pip install openai'."
         )
     api_key = os.getenv("OPENAI_API_KEY")
     if not api_key:
         raise RuntimeError("OPENAI_API_KEY environment variable is required.")
-    openai.api_key = api_key
+    # Initialize a new OpenAI client with the provided API key. Additional
+    # parameters (such as `organization` or `project`) could be supplied via
+    # environment variables if needed.
+    openai_client = OpenAI(api_key=api_key)
 
 
 app = Flask(__name__)
@@ -91,28 +111,40 @@ conversations: Dict[str, List[Dict[str, Any]]] = {}
 
 def generate_response(session_id: str, user_message: str, persona_prompt: str) -> str:
     """
-    Send the user message to OpenAI's ChatCompletion API and return the assistant's
-    reply. Maintains history per session_id. If an error occurs, returns an
-    explanatory message.
+    Send the user message to OpenAI's chat API and return the assistant's reply.
+    Maintains conversation history per session_id. If an error occurs, returns
+    an explanatory message instead of raising.
+
+    The newer OpenAI Python library (>=1.0) uses an instance of `OpenAI` to
+    access resources. The `chat.completions.create` method is used to
+    generate responses from chat models. This function builds a message list
+    consisting of a system prompt followed by the conversation history and
+    sends it to the API.
     """
-    # Append user message to history
+    # Append the user's message to the session history
     history = conversations.setdefault(session_id, [])
     history.append({"role": "user", "content": user_message})
-    # Build conversation context
+    # Combine persona/system prompt with history
     messages = [{"role": "system", "content": persona_prompt}] + history
-    # Call OpenAI API
     try:
         ensure_openai_configured()
-        response = openai.ChatCompletion.create(
-            model=os.getenv("OPENAI_MODEL", "gpt-3.5-turbo"),
+        # Determine model and parameters from environment with sensible defaults.
+        model_name = os.getenv("OPENAI_MODEL", "gpt-4o")
+        max_tokens = int(os.getenv("OPENAI_MAX_TOKENS", 500))
+        temperature = float(os.getenv("OPENAI_TEMPERATURE", 0.7))
+        # Use the client to create a chat completion. See
+        # https://platform.openai.com/docs/api-reference/chat/create for details.
+        response = openai_client.chat.completions.create(
+            model=model_name,
             messages=messages,
-            max_tokens=int(os.getenv("OPENAI_MAX_TOKENS", 500)),
-            temperature=float(os.getenv("OPENAI_TEMPERATURE", 0.7)),
+            max_tokens=max_tokens,
+            temperature=temperature,
         )
+        # Extract assistant message
         assistant_msg = response.choices[0].message.content.strip()
     except Exception as e:
         return f"Sorry, I'm unable to process your request right now: {e}"
-    # Append assistant message
+    # Append assistant response to history
     history.append({"role": "assistant", "content": assistant_msg})
     return assistant_msg
 
