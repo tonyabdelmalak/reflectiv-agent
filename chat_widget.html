@@ -8,15 +8,28 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Reflectiv Chat Widget</title>
   <style>
+    /*
+     * Chat widget styling
+     *
+     * The chat panel is hidden by default and toggled by a button. It is
+     * positioned near the top‑right of the page so visitors can easily
+     * discover it without needing to scroll. Adjust the `top` and `right`
+     * offsets to fine‑tune its placement relative to your header or nav bar.
+     */
     #chat-container {
+      position: fixed;
+      top: 80px;
+      right: 20px;
+      width: 320px;
+      height: 420px;
       border: 1px solid #ccc;
-      border-radius: 5px;
-      width: 100%;
-      max-width: 350px;
-      height: 450px;
-      display: flex;
+      border-radius: 8px;
+      background: #fff;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+      display: none; /* hidden until toggled */
       flex-direction: column;
       font-family: Arial, sans-serif;
+      z-index: 9999;
     }
     #conversation {
       flex: 1;
@@ -33,9 +46,24 @@
       padding: 10px;
       font-size: 14px;
     }
+    #chat-toggle {
+      position: fixed;
+      top: 80px;
+      right: 20px;
+      background: #007bff;
+      color: #fff;
+      padding: 12px 16px;
+      border-radius: 20px;
+      cursor: pointer;
+      font-weight: bold;
+      z-index: 10000;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+    }
   </style>
 </head>
 <body>
+  <!-- Toggle button to open/close the chat. Placed near the nav bar. -->
+  <div id="chat-toggle">Chat with Tony</div>
   <div id="chat-container">
     <div id="conversation"></div>
     <input id="user-input" type="text" placeholder="Type your question..." autocomplete="off" />
@@ -45,6 +73,8 @@
     let sessionId = null;
     const convo = document.getElementById('conversation');
     const input = document.getElementById('user-input');
+    const chatContainer = document.getElementById('chat-container');
+    const toggleBtn = document.getElementById('chat-toggle');
     // Replace this with your deployment URL, e.g., 'https://yourdomain.com/chat'
     const chatEndpoint = window.ChatEndpoint || 'http://localhost:5000/chat';
 
@@ -54,6 +84,15 @@
       convo.appendChild(p);
       convo.scrollTop = convo.scrollHeight;
     }
+
+    // Toggle chat visibility when the button is clicked
+    toggleBtn.addEventListener('click', function() {
+      if (chatContainer.style.display === 'none' || !chatContainer.style.display) {
+        chatContainer.style.display = 'flex';
+      } else {
+        chatContainer.style.display = 'none';
+      }
+    });
 
     async function sendMessage(msg) {
       try {

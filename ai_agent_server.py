@@ -84,8 +84,22 @@ def ensure_openai_configured() -> None:
         raise RuntimeError("OPENAI_API_KEY environment variable is required.")
     # Initialize a new OpenAI client with the provided API key. Additional
     # parameters (such as `organization` or `project`) could be supplied via
-    # environment variables if needed.
+    # environment variables if needed.  If a custom API base URL is provided
+    # (for example, when using an OpenAI‑compatible provider like OpenRouter),
+    # set the client's `base_url` after instantiation.
     openai_client = OpenAI(api_key=api_key)
+    # Apply a custom base URL if configured.  The environment variable
+    # OPENAI_BASE_URL is recognized by the newer OpenAI client; if set it
+    # overrides the default API endpoint.  This is useful when using
+    # OpenAI‑compatible providers such as openrouter.ai.
+    base_url = os.getenv("OPENAI_BASE_URL") or os.getenv("OPENAI_API_BASE")
+    if base_url:
+        try:
+            # Cast to string to satisfy type checkers
+            openai_client.base_url = str(base_url)
+        except Exception:
+            # Ignore invalid URLs; the client will fall back to the default
+            pass
 
 
 app = Flask(__name__)
