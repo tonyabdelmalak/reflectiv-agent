@@ -1,21 +1,14 @@
 <!DOCTYPE html>
-<!-- Simple chat widget for interacting with the Reflectiv AI agent.
+<!-- Chat widget to interact with Tony's AI assistant.
      This widget connects to the /chat endpoint of your server and displays
      messages in a conversation view. Adjust the CSS to match your brand. -->
 <html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Reflectiv Chat Widget</title>
+  <title>Chat Widget</title>
   <style>
-    /*
-     * Chat widget styling
-     *
-     * The chat panel is hidden by default and toggled by a button. It is
-     * positioned near the top‑right of the page so visitors can easily
-     * discover it without needing to scroll. Adjust the `top` and `right`
-     * offsets to fine‑tune its placement relative to your header or nav bar.
-     */
+    /* Chat panel styling */
     #chat-container {
       position: fixed;
       top: 80px;
@@ -47,11 +40,9 @@
       font-size: 14px;
     }
     /*
-     * The chat toggle uses Tony's portrait as an avatar.  It’s styled as a
-     * circular button positioned near the top‑right of the page.  Adjust the
-     * width/height or top/right offsets to reposition it.  A subtle box
-     * shadow helps the photo stand out against the page.  When clicked,
-     * it toggles the chat container.
+     * The chat toggle uses Tony's portrait as a background on a div rather
+     * than an <img>.  This avoids stretching on mobile devices.  The
+     * background image is centered and covers the entire circle.
      */
     #chat-toggle {
       position: fixed;
@@ -60,8 +51,10 @@
       width: 64px;
       height: 64px;
       border-radius: 50%;
-      overflow: hidden;
-      object-fit: cover; /* ensure the avatar maintains its aspect ratio and fills the circle */
+      background-image: url('tony_avatar.jpg');
+      background-size: cover;
+      background-position: center;
+      background-repeat: no-repeat;
       cursor: pointer;
       z-index: 10000;
       box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
@@ -69,8 +62,8 @@
   </style>
 </head>
 <body>
-  <!-- Toggle button to open/close the chat.  Uses Tony's avatar image. -->
-  <img id="chat-toggle" src="tony_avatar.jpg" alt="Chat with Tony" />
+  <!-- Toggle button to open/close the chat.  Uses Tony's avatar as a background image. -->
+  <div id="chat-toggle" title="Chat with Tony"></div>
   <div id="chat-container">
     <div id="conversation"></div>
     <input id="user-input" type="text" placeholder="Type your question..." autocomplete="off" />
@@ -82,7 +75,7 @@
     const input = document.getElementById('user-input');
     const chatContainer = document.getElementById('chat-container');
     const toggleBtn = document.getElementById('chat-toggle');
-    // Replace this with your deployment URL, e.g., 'https://yourdomain.com/chat'
+    // Use global ChatEndpoint if set, otherwise default to local server
     const chatEndpoint = window.ChatEndpoint || 'http://localhost:5000/chat';
 
     function appendMessage(sender, text) {
@@ -94,11 +87,7 @@
 
     // Toggle chat visibility when the avatar is clicked
     toggleBtn.addEventListener('click', function() {
-      if (chatContainer.style.display === 'none' || !chatContainer.style.display) {
-        chatContainer.style.display = 'flex';
-      } else {
-        chatContainer.style.display = 'none';
-      }
+      chatContainer.style.display = (chatContainer.style.display === 'none' || !chatContainer.style.display) ? 'flex' : 'none';
     });
 
     async function sendMessage(msg) {
@@ -112,14 +101,9 @@
         if (data.session_id) sessionId = data.session_id;
         if (data.response) {
           appendMessage('Agent', data.response);
-          // Speak the response using the browser's SpeechSynthesis API.  The
-          // utterance can be customised (e.g., pitch or rate) to sound more
-          // human‑like.  Visitors can disable sound via their browser if
-          // desired.
-          // Cancel any ongoing speech to avoid overlapping utterances
+          // Speak the response using browser TTS. Cancel previous speech first.
           window.speechSynthesis.cancel();
           const utterance = new SpeechSynthesisUtterance(data.response);
-          // Use a friendly, warm tone with moderate pitch and rate for natural delivery
           utterance.pitch = 1.0;
           utterance.rate = 1.0;
           utterance.volume = 1.0;
@@ -130,6 +114,7 @@
       }
     }
 
+    // Handle Enter key to send messages
     input.addEventListener('keydown', function(event) {
       if (event.key === 'Enter') {
         const msg = input.value.trim();
