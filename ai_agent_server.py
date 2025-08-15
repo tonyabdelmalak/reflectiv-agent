@@ -255,7 +255,7 @@ def speak_endpoint():
             # supports voices like 'alloy', 'echo', 'fable', 'onyx',
             # 'nova' and 'shimmer'. 'fable' is a male voice with a
             # friendly tone.
-            voice = os.getenv("OPENAI_VOICE", "fable")
+            voice = os.getenv("OPENAI_VOICE", "echo")
             # Select the model. 'tts-1' is the default; 'tts-1-hd'
             # offers higher quality at a higher cost. Users can set
             # OPENAI_TTS_MODEL to override.
