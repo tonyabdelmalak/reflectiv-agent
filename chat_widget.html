@@ -71,6 +71,19 @@
   </div>
 <script>
   (function() {
+    // Preload voices on page load. iOS Safari sometimes requires
+    // an initial call to getVoices() in a user context to prime
+    // the speech synthesis engine. Without this, the voices list can
+    // remain empty and speech may silently fail.
+    document.addEventListener('DOMContentLoaded', () => {
+      try {
+        // Trigger voice loading. The returned array is not used here
+        // but calling this early helps ensure voices are available later.
+        window.speechSynthesis.getVoices();
+      } catch (e) {
+        // Ignore errors; some browsers may throw if not available yet.
+      }
+    });
     let sessionId = null;
     const convo = document.getElementById('conversation');
     const input = document.getElementById('user-input');
@@ -102,16 +115,35 @@
         if (data.session_id) sessionId = data.session_id;
         if (data.response) {
           appendMessage('Agent', data.response);
-          // Speak the response using browser TTS. Cancel previous speech first.
+          // Speak the response using browser TTS.
+          // Ensure we cancel any ongoing utterances before starting a new one.
           window.speechSynthesis.cancel();
-              const utterance = new SpeechSynthesisUtterance(data.response);
-              // Specify language explicitly to improve cross‑device voice
-              utterance.lang = 'en-US';
-              // Set a friendly pitch, rate and volume
-              utterance.pitch = 1.0;
-              utterance.rate = 1.0;
-              utterance.volume = 1.0;
-              window.speechSynthesis.speak(utterance);
+          const speakResponse = (text) => {
+            // Construct a new utterance
+            const utterance = new SpeechSynthesisUtterance(text);
+            // Set language explicitly to US English
+            utterance.lang = 'en-US';
+            // Select an English voice if one is available. Some browsers
+            // return voices asynchronously, so we use the preloaded voices.
+            const voices = window.speechSynthesis.getVoices();
+            const english = voices.find(v => v.lang && v.lang.startsWith('en'));
+            if (english) utterance.voice = english;
+            // Adjust pitch, rate and volume for a natural tone
+            utterance.pitch = 1.0;
+            utterance.rate = 1.0;
+            utterance.volume = 1.0;
+            window.speechSynthesis.speak(utterance);
+          };
+          const existingVoices = window.speechSynthesis.getVoices();
+          if (existingVoices && existingVoices.length > 0) {
+            // Voices already available, speak immediately
+            speakResponse(data.response);
+          } else {
+            // Voices not yet loaded; wait for voiceschanged event
+            window.speechSynthesis.onvoiceschanged = () => {
+              speakResponse(data.response);
+            };
+          }
         }
       } catch (err) {
         appendMessage('Agent', 'Sorry, there was an error connecting to the server.');
