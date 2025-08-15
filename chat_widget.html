@@ -56,9 +56,6 @@
       cursor: pointer;
       font-size: 20px;
     }
-    #chat-controls button.active {
-      color: #007bff;
-    }
     /* The chat toggle uses Tony's portrait as a background on a div rather
        than an <img>. This avoids stretching on mobile devices. */
     #chat-toggle {
@@ -86,9 +83,7 @@
     <div id="conversation"></div>
     <input id="user-input" type="text" placeholder="Type your question..." autocomplete="off" />
     <div id="chat-controls">
-      <!-- Voice playback toggle button -->
-      <button id="voice-toggle" title="Toggle voice responses">🔈</button>
-      <!-- Microphone input button -->
+      <!-- Microphone input button (starts voice capture and enables voice playback) -->
       <button id="mic-button" title="Speak your question">🎤</button>
     </div>
   </div>
@@ -110,12 +105,14 @@
     const input = document.getElementById('user-input');
     const chatContainer = document.getElementById('chat-container');
     const toggleBtn = document.getElementById('chat-toggle');
-    const voiceToggleBtn = document.getElementById('voice-toggle');
+    // Grab the microphone button. This single control now handles both
+    // speech input and voice playback. When the mic is clicked, it
+    // starts listening for your question and, once the agent responds,
+    // will automatically speak the reply.
     const micBtn = document.getElementById('mic-button');
-    // Start with voice enabled by default
+    // Voice playback is always enabled by default.  There is no
+    // separate toggle anymore to avoid confusing the user.
     let voiceEnabled = true;
-    // Mark the toggle as active initially
-    voiceToggleBtn.classList.add('active');
     // Use global ChatEndpoint if set, otherwise default to local server
     const chatEndpoint = window.ChatEndpoint || 'http://localhost:5000/chat';
     // Optional endpoint for server‑side text‑to‑speech. When set,
@@ -219,11 +216,7 @@
       }
     });
 
-    // Toggle voice playback on/off
-    voiceToggleBtn.addEventListener('click', () => {
-      voiceEnabled = !voiceEnabled;
-      voiceToggleBtn.classList.toggle('active', voiceEnabled);
-    });
+    // No separate voice toggle button. Voice playback is always enabled.
 
     // Start speech recognition to capture voice input
     micBtn.addEventListener('click', () => {
