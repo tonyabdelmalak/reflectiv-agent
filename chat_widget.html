@@ -82,10 +82,8 @@
   <div id="chat-container">
     <div id="conversation"></div>
     <input id="user-input" type="text" placeholder="Type your question..." autocomplete="off" />
-    <div id="chat-controls">
-      <!-- Microphone input button (starts voice capture and enables voice playback) -->
-      <button id="mic-button" title="Speak your question">🎤</button>
-    </div>
+    <!-- Removed microphone and voice controls: chat is now type-only -->
+    <!-- Voice input and playback have been disabled to simplify the interface. -->
   </div>
 <script>
   (function() {
@@ -109,17 +107,17 @@
     // speech input and voice playback. When the mic is clicked, it
     // starts listening for your question and, once the agent responds,
     // will automatically speak the reply.
-    const micBtn = document.getElementById('mic-button');
-    // Voice playback is always enabled by default.  There is no
-    // separate toggle anymore to avoid confusing the user.
-    let voiceEnabled = true;
+    // Voice input has been removed, and voice playback is disabled by default.
+    // Setting this to false prevents any server or browser text‑to‑speech requests.
+    let voiceEnabled = false;
     // Use global ChatEndpoint if set, otherwise default to local server
     const chatEndpoint = window.ChatEndpoint || 'http://localhost:5000/chat';
     // Optional endpoint for server‑side text‑to‑speech. When set,
     // responses will be spoken via this endpoint rather than the
     // browser's speech synthesis.  Define window.TtsEndpoint in the
     // embedding page to enable server TTS (e.g., 'https://yourserver.com/speak').
-    const ttsEndpoint = window.TtsEndpoint || null;
+    // The server‑side TTS endpoint is no longer used when voice playback is disabled.
+    const ttsEndpoint = null;
 
     function appendMessage(sender, text) {
       const p = document.createElement('p');
@@ -144,60 +142,9 @@
         if (data.session_id) sessionId = data.session_id;
         if (data.response) {
           appendMessage('Agent', data.response);
-          // Speak the response if voice is enabled. Use server‑side TTS if
-          // configured; otherwise fall back to browser speech synthesis.
-          if (voiceEnabled) {
-            if (ttsEndpoint) {
-              try {
-                const ttsResp = await fetch(ttsEndpoint, {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({ text: data.response })
-                });
-                const ttsData = await ttsResp.json();
-                if (ttsData.audio) {
-                  const audio = new Audio('data:audio/mp3;base64,' + ttsData.audio);
-                  audio.play();
-                }
-              } catch (err) {
-                console.error('TTS playback error:', err);
-              }
-            } else {
-              // Browser speech synthesis fallback
-              try {
-                window.speechSynthesis.cancel();
-                const utterance = new SpeechSynthesisUtterance(data.response);
-                utterance.lang = 'en-US';
-                const voices = window.speechSynthesis.getVoices();
-                // Try to pick a male English voice if available.  We look for
-                // common male names in the voice name (John, Mike, Harry, etc.) and
-                // fall back to the first English voice if no male voice is found.
-                const maleNames = ['john','mike','harry','jack','mason','daniel','ajit','oran','felix','alex','david'];
-                let selectedVoice = null;
-                if (voices && voices.length > 0) {
-                  selectedVoice = voices.find(v => v.lang && v.lang.toLowerCase().startsWith('en') && maleNames.some(n => v.name && v.name.toLowerCase().includes(n)));
-                  if (!selectedVoice) {
-                    selectedVoice = voices.find(v => v.lang && v.lang.toLowerCase().startsWith('en'));
-                  }
-                }
-                if (selectedVoice) utterance.voice = selectedVoice;
-                // Adjust speech parameters: make the voice faster and slightly lower pitch
-                utterance.pitch = 1.0;
-                utterance.rate = 1.25; // increase rate for faster speech
-                utterance.volume = 1.0;
-                // If voices are not yet loaded, wait for the event
-                if (voices && voices.length > 0) {
-                  window.speechSynthesis.speak(utterance);
-                } else {
-                  window.speechSynthesis.onvoiceschanged = () => {
-                    window.speechSynthesis.speak(utterance);
-                  };
-                }
-              } catch (err) {
-                console.error('Browser TTS error:', err);
-              }
-            }
-          }
+          // Voice playback is disabled when voiceEnabled is false.
+          // The assistant will only display text responses without attempting
+          // to speak them.
         }
       } catch (err) {
         appendMessage('Agent', 'Sorry, there was an error connecting to the server.');
@@ -216,32 +163,7 @@
       }
     });
 
-    // No separate voice toggle button. Voice playback is always enabled.
-
-    // Start speech recognition to capture voice input
-    micBtn.addEventListener('click', () => {
-      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-      if (!SpeechRecognition) {
-        alert('Speech recognition is not supported in this browser.');
-        return;
-      }
-      const recognition = new SpeechRecognition();
-      recognition.lang = 'en-US';
-      recognition.interimResults = false;
-      recognition.maxAlternatives = 1;
-      recognition.onresult = (event) => {
-        const transcript = event.results[0][0].transcript.trim();
-        if (transcript) {
-          appendMessage('You', transcript);
-          sendMessage(transcript);
-        }
-      };
-      recognition.onerror = (event) => {
-        console.error('Speech recognition error:', event.error);
-        alert('Speech recognition error: ' + event.error);
-      };
-      recognition.start();
-    });
+    // Removed speech recognition and microphone listener: chat is now text‑only.
   })();
 </script>
 </body>
