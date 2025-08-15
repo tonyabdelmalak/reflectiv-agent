@@ -118,6 +118,11 @@
     voiceToggleBtn.classList.add('active');
     // Use global ChatEndpoint if set, otherwise default to local server
     const chatEndpoint = window.ChatEndpoint || 'http://localhost:5000/chat';
+    // Optional endpoint for server‑side text‑to‑speech. When set,
+    // responses will be spoken via this endpoint rather than the
+    // browser's speech synthesis.  Define window.TtsEndpoint in the
+    // embedding page to enable server TTS (e.g., 'https://yourserver.com/speak').
+    const ttsEndpoint = window.TtsEndpoint || null;
 
     function appendMessage(sender, text) {
       const p = document.createElement('p');
@@ -142,26 +147,48 @@
         if (data.session_id) sessionId = data.session_id;
         if (data.response) {
           appendMessage('Agent', data.response);
-          // Cancel any ongoing speech before speaking new response
-          window.speechSynthesis.cancel();
-          const speakResponse = (text) => {
-            const utterance = new SpeechSynthesisUtterance(text);
-            utterance.lang = 'en-US';
-            const voices = window.speechSynthesis.getVoices();
-            const english = voices.find(v => v.lang && v.lang.startsWith('en'));
-            if (english) utterance.voice = english;
-            utterance.pitch = 1.0;
-            utterance.rate = 1.0;
-            utterance.volume = 1.0;
-            window.speechSynthesis.speak(utterance);
-          };
-          const existingVoices = window.speechSynthesis.getVoices();
-          if (existingVoices && existingVoices.length > 0) {
-            if (voiceEnabled) speakResponse(data.response);
-          } else {
-            window.speechSynthesis.onvoiceschanged = () => {
-              if (voiceEnabled) speakResponse(data.response);
-            };
+          // Speak the response if voice is enabled. Use server‑side TTS if
+          // configured; otherwise fall back to browser speech synthesis.
+          if (voiceEnabled) {
+            if (ttsEndpoint) {
+              try {
+                const ttsResp = await fetch(ttsEndpoint, {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ text: data.response })
+                });
+                const ttsData = await ttsResp.json();
+                if (ttsData.audio) {
+                  const audio = new Audio('data:audio/mp3;base64,' + ttsData.audio);
+                  audio.play();
+                }
+              } catch (err) {
+                console.error('TTS playback error:', err);
+              }
+            } else {
+              // Browser speech synthesis fallback
+              try {
+                window.speechSynthesis.cancel();
+                const utterance = new SpeechSynthesisUtterance(data.response);
+                utterance.lang = 'en-US';
+                const voices = window.speechSynthesis.getVoices();
+                const english = voices.find(v => v.lang && v.lang.startsWith('en'));
+                if (english) utterance.voice = english;
+                utterance.pitch = 1.0;
+                utterance.rate = 1.0;
+                utterance.volume = 1.0;
+                // If voices are not yet loaded, wait for the event
+                if (voices && voices.length > 0) {
+                  window.speechSynthesis.speak(utterance);
+                } else {
+                  window.speechSynthesis.onvoiceschanged = () => {
+                    window.speechSynthesis.speak(utterance);
+                  };
+                }
+              } catch (err) {
+                console.error('Browser TTS error:', err);
+              }
+            }
           }
         }
       } catch (err) {

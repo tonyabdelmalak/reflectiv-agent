@@ -5,3 +5,4 @@ flask
 openai>=1.0.0
 twilio
 flask-cors
+gTTS

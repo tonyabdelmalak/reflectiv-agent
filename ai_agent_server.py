@@ -29,6 +29,21 @@ import uuid
 from typing import Dict, List, Any
 from flask import Flask, request, jsonify
 
+# Try importing gTTS for offline text‑to‑speech. If this import fails,
+# the /speak endpoint will return an error. gTTS uses Google's translate
+# service to synthesize speech and does not require an API key. It
+# fetches audio from Google when called, so a working internet
+# connection is required on the server. The generated audio will be
+# returned to the client as a base64-encoded MP3.
+try:
+    from gtts import gTTS  # type: ignore
+    import io
+    import base64
+except ImportError:
+    gTTS = None  # type: ignore
+    io = None  # type: ignore
+    base64 = None  # type: ignore
+
 # Attempt to import external libraries. If missing, set them to None.
 # The newer OpenAI Python library (>=1.0) exposes an `OpenAI` client class rather
 # than static methods. We attempt to import it here. If the import fails, the
@@ -196,6 +211,35 @@ def voice_endpoint():
     # Listen for next utterance
     vr.listen(timeout=5)
     return str(vr), 200
+
+# ----------------------------------------------------------------------------
+# Text‑to‑Speech endpoint
+#
+# The /speak endpoint provides an alternative way for the web chat to obtain
+# speech audio when client‑side SpeechSynthesis is unreliable. It accepts
+# JSON with a `text` field, uses gTTS to synthesize the speech, and
+# returns a JSON response with a base64‑encoded MP3. Clients can decode
+# this data URI and play it with the HTML5 Audio API. If gTTS is not
+# installed or cannot fetch audio, an error message is returned.
+@app.route('/speak', methods=['POST'])
+def speak_endpoint():
+    data = request.get_json() or {}
+    text = data.get('text', '')
+    if not text:
+        return jsonify({"error": "Missing text"}), 400
+    # Ensure gTTS is available
+    if gTTS is None or io is None or base64 is None:
+        return jsonify({"error": "Text-to-speech is not available on this server."}), 500
+    try:
+        # Use gTTS to generate speech. Language defaults to English.
+        tts = gTTS(text=text, lang='en')
+        audio_bytes = io.BytesIO()
+        tts.write_to_fp(audio_bytes)
+        audio_bytes.seek(0)
+        encoded_audio = base64.b64encode(audio_bytes.read()).decode('utf-8')
+        return jsonify({"audio": encoded_audio, "format": "mp3"})
+    except Exception as e:
+        return jsonify({"error": f"TTS generation failed: {e}"}), 500
 
 
 @app.route('/')
