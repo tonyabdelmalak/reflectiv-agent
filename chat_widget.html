@@ -38,12 +38,29 @@
       border-top: 1px solid #ccc;
       padding: 10px;
       font-size: 14px;
+      width: 100%;
+      box-sizing: border-box;
     }
-    /*
-     * The chat toggle uses Tony's portrait as a background on a div rather
-     * than an <img>.  This avoids stretching on mobile devices.  The
-     * background image is centered and covers the entire circle.
-     */
+    /* Controls for microphone and voice toggle */
+    #chat-controls {
+      display: flex;
+      justify-content: flex-end;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 10px;
+      border-top: 1px solid #eee;
+    }
+    #chat-controls button {
+      background: none;
+      border: none;
+      cursor: pointer;
+      font-size: 20px;
+    }
+    #chat-controls button.active {
+      color: #007bff;
+    }
+    /* The chat toggle uses Tony's portrait as a background on a div rather
+       than an <img>. This avoids stretching on mobile devices. */
     #chat-toggle {
       position: fixed;
       top: 80px;
@@ -63,11 +80,17 @@
   </style>
 </head>
 <body>
-  <!-- Toggle button to open/close the chat.  Uses Tony's avatar as a background image. -->
+  <!-- Toggle button to open/close the chat. Uses Tony's avatar as a background image. -->
   <div id="chat-toggle" title="Chat with Tony"></div>
   <div id="chat-container">
     <div id="conversation"></div>
     <input id="user-input" type="text" placeholder="Type your question..." autocomplete="off" />
+    <div id="chat-controls">
+      <!-- Voice playback toggle button -->
+      <button id="voice-toggle" title="Toggle voice responses">🔈</button>
+      <!-- Microphone input button -->
+      <button id="mic-button" title="Speak your question">🎤</button>
+    </div>
   </div>
 <script>
   (function() {
@@ -77,8 +100,6 @@
     // remain empty and speech may silently fail.
     document.addEventListener('DOMContentLoaded', () => {
       try {
-        // Trigger voice loading. The returned array is not used here
-        // but calling this early helps ensure voices are available later.
         window.speechSynthesis.getVoices();
       } catch (e) {
         // Ignore errors; some browsers may throw if not available yet.
@@ -89,6 +110,12 @@
     const input = document.getElementById('user-input');
     const chatContainer = document.getElementById('chat-container');
     const toggleBtn = document.getElementById('chat-toggle');
+    const voiceToggleBtn = document.getElementById('voice-toggle');
+    const micBtn = document.getElementById('mic-button');
+    // Start with voice enabled by default
+    let voiceEnabled = true;
+    // Mark the toggle as active initially
+    voiceToggleBtn.classList.add('active');
     // Use global ChatEndpoint if set, otherwise default to local server
     const chatEndpoint = window.ChatEndpoint || 'http://localhost:5000/chat';
 
@@ -115,20 +142,14 @@
         if (data.session_id) sessionId = data.session_id;
         if (data.response) {
           appendMessage('Agent', data.response);
-          // Speak the response using browser TTS.
-          // Ensure we cancel any ongoing utterances before starting a new one.
+          // Cancel any ongoing speech before speaking new response
           window.speechSynthesis.cancel();
           const speakResponse = (text) => {
-            // Construct a new utterance
             const utterance = new SpeechSynthesisUtterance(text);
-            // Set language explicitly to US English
             utterance.lang = 'en-US';
-            // Select an English voice if one is available. Some browsers
-            // return voices asynchronously, so we use the preloaded voices.
             const voices = window.speechSynthesis.getVoices();
             const english = voices.find(v => v.lang && v.lang.startsWith('en'));
             if (english) utterance.voice = english;
-            // Adjust pitch, rate and volume for a natural tone
             utterance.pitch = 1.0;
             utterance.rate = 1.0;
             utterance.volume = 1.0;
@@ -136,12 +157,10 @@
           };
           const existingVoices = window.speechSynthesis.getVoices();
           if (existingVoices && existingVoices.length > 0) {
-            // Voices already available, speak immediately
-            speakResponse(data.response);
+            if (voiceEnabled) speakResponse(data.response);
           } else {
-            // Voices not yet loaded; wait for voiceschanged event
             window.speechSynthesis.onvoiceschanged = () => {
-              speakResponse(data.response);
+              if (voiceEnabled) speakResponse(data.response);
             };
           }
         }
@@ -160,6 +179,37 @@
           input.value = '';
         }
       }
+    });
+
+    // Toggle voice playback on/off
+    voiceToggleBtn.addEventListener('click', () => {
+      voiceEnabled = !voiceEnabled;
+      voiceToggleBtn.classList.toggle('active', voiceEnabled);
+    });
+
+    // Start speech recognition to capture voice input
+    micBtn.addEventListener('click', () => {
+      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+      if (!SpeechRecognition) {
+        alert('Speech recognition is not supported in this browser.');
+        return;
+      }
+      const recognition = new SpeechRecognition();
+      recognition.lang = 'en-US';
+      recognition.interimResults = false;
+      recognition.maxAlternatives = 1;
+      recognition.onresult = (event) => {
+        const transcript = event.results[0][0].transcript.trim();
+        if (transcript) {
+          appendMessage('You', transcript);
+          sendMessage(transcript);
+        }
+      };
+      recognition.onerror = (event) => {
+        console.error('Speech recognition error:', event.error);
+        alert('Speech recognition error: ' + event.error);
+      };
+      recognition.start();
     });
   })();
 </script>
