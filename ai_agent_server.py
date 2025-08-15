@@ -217,26 +217,81 @@ def voice_endpoint():
 #
 # The /speak endpoint provides an alternative way for the web chat to obtain
 # speech audio when client‑side SpeechSynthesis is unreliable. It accepts
-# JSON with a `text` field, uses gTTS to synthesize the speech, and
-# returns a JSON response with a base64‑encoded MP3. Clients can decode
-# this data URI and play it with the HTML5 Audio API. If gTTS is not
-# installed or cannot fetch audio, an error message is returned.
+# JSON with a `text` field. This endpoint attempts to generate speech
+# using OpenAI's text-to-speech API first.  If OpenAI TTS fails (for
+# example, due to missing credentials, unsupported models, or network
+# errors), it falls back to gTTS (Google Translate TTS) if available.
+#
+# Clients receive a JSON object with the base64‑encoded audio and the
+# audio format (currently always "mp3"). The client can decode this
+# data URI and play it via the HTML5 Audio API.
 @app.route('/speak', methods=['POST'])
 def speak_endpoint():
     data = request.get_json() or {}
     text = data.get('text', '')
     if not text:
         return jsonify({"error": "Missing text"}), 400
-    # Ensure gTTS is available
+    # First attempt OpenAI TTS if the OpenAI client is configured.
+    try:
+        ensure_openai_configured()
+        # Build a dedicated audio client so we can override the base URL
+        # without affecting chat completions. Some environments may use
+        # OpenAI‑compatible providers for chat (via OPENAI_BASE_URL) but
+        # still want to call the official OpenAI API for TTS.
+        from openai import OpenAI as OpenAIAudio  # type: ignore
+        audio_api_key = os.getenv("OPENAI_API_KEY")
+        if audio_api_key:
+            audio_client = OpenAIAudio(api_key=audio_api_key)
+            # Allow overriding the base URL for audio separately via
+            # OPENAI_AUDIO_BASE_URL. Defaults to the official OpenAI
+            # endpoint.
+            audio_base_url = os.getenv("OPENAI_AUDIO_BASE_URL", "https://api.openai.com/v1")
+            try:
+                audio_client.base_url = str(audio_base_url)
+            except Exception:
+                pass
+            # Choose a voice. Users can override the default via
+            # OPENAI_VOICE environment variable. OpenAI currently
+            # supports voices like 'alloy', 'echo', 'fable', 'onyx',
+            # 'nova' and 'shimmer'. 'fable' is a male voice with a
+            # friendly tone.
+            voice = os.getenv("OPENAI_VOICE", "fable")
+            # Select the model. 'tts-1' is the default; 'tts-1-hd'
+            # offers higher quality at a higher cost. Users can set
+            # OPENAI_TTS_MODEL to override.
+            tts_model = os.getenv("OPENAI_TTS_MODEL", "tts-1")
+            # Speed adjustment. Must be between 0.25 and 4.0 per
+            # OpenAI's specification. Default to 1.2 for slightly
+            # faster speech. Users can override via OPENAI_TTS_SPEED.
+            try:
+                tts_speed = float(os.getenv("OPENAI_TTS_SPEED", "1.2"))
+            except ValueError:
+                tts_speed = 1.2
+            # Call the OpenAI audio API. The `input` parameter is the
+            # text to synthesize. The response returns binary audio
+            # content.
+            response = audio_client.audio.speech.create(
+                model=tts_model,
+                voice=voice,
+                input=text,
+                speed=tts_speed,
+            )
+            audio_bytes = response.content
+            if audio_bytes:
+                encoded_audio = base64.b64encode(audio_bytes).decode("utf-8")
+                return jsonify({"audio": encoded_audio, "format": "mp3"})
+    except Exception:
+        # Ignore errors and fall back to gTTS below.
+        pass
+    # Fall back to gTTS if OpenAI TTS is unavailable or fails.
     if gTTS is None or io is None or base64 is None:
         return jsonify({"error": "Text-to-speech is not available on this server."}), 500
     try:
-        # Use gTTS to generate speech. Language defaults to English.
         tts = gTTS(text=text, lang='en')
-        audio_bytes = io.BytesIO()
-        tts.write_to_fp(audio_bytes)
-        audio_bytes.seek(0)
-        encoded_audio = base64.b64encode(audio_bytes.read()).decode('utf-8')
+        audio_buffer = io.BytesIO()
+        tts.write_to_fp(audio_buffer)
+        audio_buffer.seek(0)
+        encoded_audio = base64.b64encode(audio_buffer.read()).decode('utf-8')
         return jsonify({"audio": encoded_audio, "format": "mp3"})
     except Exception as e:
         return jsonify({"error": f"TTS generation failed: {e}"}), 500
