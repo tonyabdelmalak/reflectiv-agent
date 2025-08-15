@@ -53,7 +53,8 @@
       border-radius: 50%;
       background-image: url('tony_avatar.jpg');
       background-size: cover;
-      background-position: center;
+      /* Position the image toward the top so Tony's face isn't cut off */
+      background-position: top center;
       background-repeat: no-repeat;
       cursor: pointer;
       z-index: 10000;
@@ -103,11 +104,14 @@
           appendMessage('Agent', data.response);
           // Speak the response using browser TTS. Cancel previous speech first.
           window.speechSynthesis.cancel();
-          const utterance = new SpeechSynthesisUtterance(data.response);
-          utterance.pitch = 1.0;
-          utterance.rate = 1.0;
-          utterance.volume = 1.0;
-          window.speechSynthesis.speak(utterance);
+              const utterance = new SpeechSynthesisUtterance(data.response);
+              // Specify language explicitly to improve cross‑device voice
+              utterance.lang = 'en-US';
+              // Set a friendly pitch, rate and volume
+              utterance.pitch = 1.0;
+              utterance.rate = 1.0;
+              utterance.volume = 1.0;
+              window.speechSynthesis.speak(utterance);
         }
       } catch (err) {
         appendMessage('Agent', 'Sorry, there was an error connecting to the server.');
