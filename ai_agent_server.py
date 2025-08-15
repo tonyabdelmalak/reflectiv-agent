@@ -255,7 +255,7 @@ def speak_endpoint():
             # supports voices like 'alloy', 'echo', 'fable', 'onyx',
             # 'nova' and 'shimmer'. 'fable' is a male voice with a
             # friendly tone.
-            voice = os.getenv("OPENAI_VOICE", "echo")
+            voice = os.getenv("OPENAI_VOICE", "fable")
             # Select the model. 'tts-1' is the default; 'tts-1-hd'
             # offers higher quality at a higher cost. Users can set
             # OPENAI_TTS_MODEL to override.
@@ -280,21 +280,11 @@ def speak_endpoint():
             if audio_bytes:
                 encoded_audio = base64.b64encode(audio_bytes).decode("utf-8")
                 return jsonify({"audio": encoded_audio, "format": "mp3"})
-    except Exception:
-        # Ignore errors and fall back to gTTS below.
-        pass
-    # Fall back to gTTS if OpenAI TTS is unavailable or fails.
-    if gTTS is None or io is None or base64 is None:
-        return jsonify({"error": "Text-to-speech is not available on this server."}), 500
-    try:
-        tts = gTTS(text=text, lang='en')
-        audio_buffer = io.BytesIO()
-        tts.write_to_fp(audio_buffer)
-        audio_buffer.seek(0)
-        encoded_audio = base64.b64encode(audio_buffer.read()).decode('utf-8')
-        return jsonify({"audio": encoded_audio, "format": "mp3"})
     except Exception as e:
-        return jsonify({"error": f"TTS generation failed: {e}"}), 500
+        # If OpenAI TTS fails, return a clear error instead of falling back to
+        # another provider. This prevents inconsistent voices and unexpected
+        # behaviour when the primary service is unavailable.
+        return jsonify({"error": f"OpenAI TTS generation failed: {e}"}), 500
 
 
 @app.route('/')
