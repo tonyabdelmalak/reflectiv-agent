@@ -172,10 +172,21 @@
                 const utterance = new SpeechSynthesisUtterance(data.response);
                 utterance.lang = 'en-US';
                 const voices = window.speechSynthesis.getVoices();
-                const english = voices.find(v => v.lang && v.lang.startsWith('en'));
-                if (english) utterance.voice = english;
+                // Try to pick a male English voice if available.  We look for
+                // common male names in the voice name (John, Mike, Harry, etc.) and
+                // fall back to the first English voice if no male voice is found.
+                const maleNames = ['john','mike','harry','jack','mason','daniel','ajit','oran','felix','alex','david'];
+                let selectedVoice = null;
+                if (voices && voices.length > 0) {
+                  selectedVoice = voices.find(v => v.lang && v.lang.toLowerCase().startsWith('en') && maleNames.some(n => v.name && v.name.toLowerCase().includes(n)));
+                  if (!selectedVoice) {
+                    selectedVoice = voices.find(v => v.lang && v.lang.toLowerCase().startsWith('en'));
+                  }
+                }
+                if (selectedVoice) utterance.voice = selectedVoice;
+                // Adjust speech parameters: make the voice faster and slightly lower pitch
                 utterance.pitch = 1.0;
-                utterance.rate = 1.0;
+                utterance.rate = 1.25; // increase rate for faster speech
                 utterance.volume = 1.0;
                 // If voices are not yet loaded, wait for the event
                 if (voices && voices.length > 0) {
